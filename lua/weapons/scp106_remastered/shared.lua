@@ -64,7 +64,7 @@ function SWEP:SetupDataTables()
 	self:NetworkVar("Vector", 2, "SCP106Spawn")
 end
 function SWEP:Initialize()
-	if not file.Exists("scp_redux", "DATA") then
+	if not file.Exists("scp106_remastered", "DATA") then
 		file.CreateDir("scp106_remastered")
 	end
 	if not file.Exists("scp106_remastered/scp106_config.json", "DATA") then
@@ -246,7 +246,7 @@ if SERVER then
 
 		if not file.Exists("scp106_remastered", "DATA") then file.CreateDir("scp106_remastered") end
 		file.Write("scp106_remastered/scp106_spawn.txt", util.TableToJSON(SCP106Spawn))
-		ply:PrintMessage(HUD_PRINTCONSOLE, "SCP 106 Redux - Spawn Point has been saved!")
+		ply:PrintMessage(HUD_PRINTCONSOLE, "SCP 106 Remastered - Spawn Point has been saved!")
 	end )
 	concommand.Add("set_scp106_pd", function(ply)
 		if not ply:IsValid() and ply:IsSuperAdmin() then return end
@@ -254,7 +254,7 @@ if SERVER then
 
 		if not file.Exists("scp106_remastered", "DATA") then file.CreateDir("scp106_remastered") end
 		file.Write("scp106_remastered/scp106_pocketdimension.txt", util.TableToJSON(SCP106PocketDimension))
-		ply:PrintMessage(HUD_PRINTCONSOLE, "SCP 106 Redux - Pocket Dimension has been saved!")
+		ply:PrintMessage(HUD_PRINTCONSOLE, "SCP 106 Remastered - Pocket Dimension has been saved!")
 	end )
 	function SCP106FlashlightDance(ply) --The TEAM_SCP106 player should be teleported back to  their "pocketdimension" coords if someone within ~100 units turns on their flashlight. Distance needs to be playtested. 
 		if not team.GetPlayers(TEAM_SCP106)[1] or ply:Team() == TEAM_SCP106 or not ply:GetEyeTrace().Entity:IsPlayer() then return true end -- Ignores TEAM_SCP106 enabling their flashlight
