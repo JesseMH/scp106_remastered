@@ -132,16 +132,16 @@ PRIMARY ATTACK FUNCTIONS, moves the player to the saved position set with Second
 ]]--
 function SWEP:TPtoPoint()
 	local pos = self:GetOwner():GetPos()
-	if self:GetSCP106SavedPos() == Vector(0, 0, 0) then
+	if self:GetSCP106SavedPos() == vector_origin then
 		self:GetOwner():PrintMessage(HUD_PRINTTALK, "No Position Set! Use LMB to set an Exit!")
 		return
 	end
 	if pos:DistToSqr(self:GetSCP106PocketDimension()) < self.scp106_configTable.pd_dist then -- Allows you to only use this within X distance of the pocket dimension. tpdelay is simply a 2 second cooldown that starts once SCP 106 gets to the pocket dimension. 
 		self:GetOwner():SetPos(self:GetSCP106SavedPos())
-		self:GetOwner():SetLocalVelocity(Vector(0, 0, 0))
+		self:GetOwner():SetLocalVelocity(vector_origin)
 		self:GetOwner():StopSound(corrosionsound)
 		self:GetOwner():EmitSound(corrosionsound)
-		self:SetSCP106SavedPos(Vector(0, 0, 0))
+		self:SetSCP106SavedPos(vector_origin)
 		return
 	end
 end
