@@ -24,11 +24,11 @@ SWEP.AdminSpawnable = true;
 SWEP.Spawnable = true;
 
 --[[
-VARIABLES
+CUSTOM VARIABLES
 ]]--
-local laughsound = "weapons/laugh.mp3"
-local corrosionsound = "weapons/corrosion.mp3"
-local scp106DefaultConfig =
+SWEP.laughsound = "weapons/laugh.mp3"
+SWEP.corrosionsound = "weapons/corrosion.mp3"
+SWEP.scp106DefaultConfig =
 {
 	["pd_dist"] = 640000,
 	["spawn_dist"] = 90000,
@@ -40,7 +40,7 @@ local scp106DefaultConfig =
 	["flashlight_dist"] = 10000,
 	["cs_delay"] = 1
 }
-local uncollideEnt =
+SWEP.uncollideEnt =
 {
 	["func_door"] = true,
 	["prop_physics"] = true,
@@ -68,7 +68,7 @@ function SWEP:Initialize()
 		file.CreateDir("scp106_remastered")
 	end
 	if not file.Exists("scp106_remastered/scp106_config.json", "DATA") then
-		file.Write("scp106_remastered/scp106_config.json", util.TableToJSON(scp106DefaultConfig, true))
+		file.Write("scp106_remastered/scp106_config.json", util.TableToJSON(self.scp106DefaultConfig, true))
 		print("Default SCP 106 Config written")
 	end
 	if file.Exists("scp106_remastered/scp106_config.json", "DATA") then
@@ -139,8 +139,8 @@ function SWEP:TPtoPoint()
 	if pos:DistToSqr(self:GetSCP106PocketDimension()) < self.scp106_configTable.pd_dist then -- Allows you to only use this within X distance of the pocket dimension. tpdelay is simply a 2 second cooldown that starts once SCP 106 gets to the pocket dimension. 
 		self:GetOwner():SetPos(self:GetSCP106SavedPos())
 		self:GetOwner():SetLocalVelocity(vector_origin)
-		self:GetOwner():StopSound(corrosionsound)
-		self:GetOwner():EmitSound(corrosionsound)
+		self:GetOwner():StopSound(self.corrosionsound)
+		self:GetOwner():EmitSound(self.corrosionsound)
 		self:SetSCP106SavedPos(vector_origin)
 		return
 	end
@@ -203,8 +203,8 @@ function SWEP:CreateTeleportPoint()
 	  self:SetSCP106SavedPos(scp106:GetEyeTrace().HitPos)
 	  	--if self:TPTraceHull(scp106, self:GetSCP106SavedPos(), self.startingpos) then
 		local effectdata = EffectData()
-		self:GetOwner():StopSound(laughsound)
-		self:GetOwner():EmitSound(laughsound)
+		self:GetOwner():StopSound(self.laughsound)
+		self:GetOwner():EmitSound(self.laughsound)
 		effectdata:SetAngles(Angle(180,0,0))
 		effectdata:SetStart(self:GetSCP106SavedPos())
 		effectdata:SetOrigin(self:GetSCP106SavedPos())
@@ -281,7 +281,7 @@ if SERVER then
 			scp106weapon = ent1:GetActiveWeapon()
 			if ent2:GetPos():DistToSqr(scp106weapon:GetSCP106Spawn()) > ent1:GetActiveWeapon().scp106_configTable.spawn_dist then -- makes sure ent1 on TEAM_SCP106 is not within 300 units of TEAM_SCP106's spawn coords, so he can't just exit his door when closed. 
 				if CurTime() > scp106weapon:GetCollisionSoundDelay() and ent2:GetPos():Distance(ent1:GetPos()) < 57.6 then -- plays a sound no more frequently than every 2 seconds when they're close enough and checks distance between ent1 and ent2, 57.6 is a good distance to make sure the next sound trigger only happens if you're walking through a door or prop vs walking past it
-					ent2:EmitSound(corrosionsound) -- Emits a sound from ent2, so for example a door makes a sound instead of SCP 106.
+					ent2:EmitSound(scp106weapon.corrosionsound) -- Emits a sound from ent2, so for example a door makes a sound instead of SCP 106.
 					scp106weapon:SetCollisionSoundDelay(CurTime() + ent1:GetActiveWeapon().scp106_configTable.cs_delay) -- adds a 2 second delay before any more sounds will be emitted from ent2
 					return false
 				else
@@ -293,7 +293,7 @@ if SERVER then
 	end
 	function SCP106CheckEnt(ent1, ent2)
 		if not team.GetPlayers(TEAM_SCP106)[1] then return end
-		if ent1:Team() == TEAM_SCP106 and uncollideEnt[ent2:GetClass()] then -- This checks if the object you're about to collide with is one of the classes stored in uncollideEnt
+		if ent1:GetActiveWeapon():GetPrintName() == "scp106_remastered" and ent1:GetActiveWeapon().uncollideEnt[ent2:GetClass()] then
 			return SCP106EntCollision(ent1, ent2)
 		end
 		return true
