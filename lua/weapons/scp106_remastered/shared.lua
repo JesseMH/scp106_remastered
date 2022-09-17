@@ -86,9 +86,7 @@ function SWEP:Initialize()
 	end
 end
 function SWEP:PrimaryAttack()
-	if IsFirstTimePredicted() then
-		self:TPtoPoint()
-	end
+	self:TPtoPoint()
 end
 function SWEP:SecondaryAttack()
 	-- Saves a teleport point 
@@ -113,6 +111,7 @@ end
 
 function SWEP:Deploy()
 	local scp106 = self:GetOwner()
+	if (not scp106:IsValid()) then return end
 	self:SetHoldType("normal")
 	scp106:SetRunSpeed(120)
 	scp106:SetWalkSpeed(120)
@@ -125,9 +124,9 @@ end
 RELOAD FUNCTIONS
 ]]--
 function SWEP:Lunge()
+	local scp106 = self:GetOwner()
 	if CurTime() > self:GetLungeTiming() and self:GetPos():DistToSqr(self:GetSCP106Spawn()) > self.scp106_configTable.spawn_dist then
 		self:SetLungeTiming(CurTime() + self.scp106_configTable.lunge_delay)
-		local scp106 = self:GetOwner()
 		scp106:SetPos(scp106:EyePos() + Vector(0, 0, -50) + scp106:GetAimVector() * math.random(50, 75))
 	end
 end
@@ -136,15 +135,18 @@ PRIMARY ATTACK FUNCTIONS, moves the player to the saved position set with Second
 ]]--
 function SWEP:TPtoPoint()
 	local pos = self:GetOwner():GetPos()
-	if self:GetSCP106SavedPos() == vector_origin then
-		self:GetOwner():PrintMessage(HUD_PRINTTALK, "No Position Set! Use LMB to set an Exit!")
+	local scp106 = self:GetOwner()
+	if (not scp106:IsValid()) then return end
+	if self:GetSCP106SavedPos() == vector_origin and IsFirstTimePredicted() and CLIENT then
+		scp106:PrintMessage(HUD_PRINTTALK, "No Position Set! Use LMB to set an Exit!")
 		return
 	end
 	if pos:DistToSqr(self:GetSCP106PocketDimension()) < self.scp106_configTable.pd_dist then -- Allows you to only use this within X distance of the pocket dimension. tpdelay is simply a 2 second cooldown that starts once SCP 106 gets to the pocket dimension. 
-		self:GetOwner():SetPos(self:GetSCP106SavedPos())
-		self:GetOwner():SetLocalVelocity(vector_origin)
-		self:GetOwner():StopSound(self.corrosionsound)
-		self:GetOwner():EmitSound(self.corrosionsound)
+		if self:GetSCP106SavedPos() == vector_origin then return end
+		scp106:SetPos(self:GetSCP106SavedPos())
+		scp106:SetLocalVelocity(vector_origin)
+		scp106:StopSound(self.corrosionsound)
+		scp106:EmitSound(self.corrosionsound)
 		self:SetSCP106SavedPos(vector_origin)
 		return
 	end
@@ -156,6 +158,7 @@ function SWEP:BubbleChecker()
 	if CurTime() > self:GetBubbleCheckerIdle() then
 		self:SetBubbleCheckerIdle(CurTime() + self.scp106_configTable.bc_delay) -- limits checking the bubble around SCP 106 no more than ten times per second. 
 		local scp106 = self:GetOwner()
+		if (not scp106:IsValid()) then return end
 		local scp106pos = scp106:GetPos()
 		local mybubble = ents.FindInSphere(scp106pos, self.scp106_configTable.bc_dist) -- by default this checks within 100 units of the player
 		for k, v in pairs(mybubble) do
@@ -202,13 +205,14 @@ SECONDARY ATTACK FUNCTIONS
 ]]--
 function SWEP:CreateTeleportPoint()
 	local scp106 = self:GetOwner()
+	if (not scp106:IsValid()) then return end
 	self.startingpos = self:GetOwner():GetPos()
 	if self.startingpos:DistToSqr(self:GetSCP106Spawn()) > self.scp106_configTable.spawn_dist and scp106:GetEyeTrace().HitPos:DistToSqr(self:GetSCP106Spawn()) > self.scp106_configTable.spawn_dist and self.startingpos:DistToSqr(self:GetSCP106PocketDimension()) > self.scp106_configTable.pd_dist and scp106:GetEyeTrace().HitPos:DistToSqr(self:GetSCP106PocketDimension()) > self.scp106_configTable.pd_dist then -- Simply prevents you from using this on/in spawn 1 and spawn 2.   
 	  self:SetSCP106SavedPos(scp106:GetEyeTrace().HitPos)
 	  	--if self:TPTraceHull(scp106, self:GetSCP106SavedPos(), self.startingpos) then
 		local effectdata = EffectData()
-		self:GetOwner():StopSound(self.laughsound)
-		self:GetOwner():EmitSound(self.laughsound)
+		scp106:StopSound(self.laughsound)
+		scp106:EmitSound(self.laughsound)
 		effectdata:SetAngles(Angle(180,0,0))
 		effectdata:SetStart(self:GetSCP106SavedPos())
 		effectdata:SetOrigin(self:GetSCP106SavedPos())
