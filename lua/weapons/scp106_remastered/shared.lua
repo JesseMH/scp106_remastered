@@ -31,17 +31,17 @@ SWEP.laughsound = "weapons/laugh.mp3"
 SWEP.corrosionsound = "weapons/corrosion.mp3"
 SWEP.scp106DefaultConfig =
 {
-	["pd_dist"] = 640000,
-	["spawn_dist"] = 90000,
-	["primaryattack_delay"] = 4,
-	["secondaryattack_delay"] = 0.25,
-	["lunge_delay"] = 1,
-	["bc_dist"] = 80,
-	["bc_delay"] = 0.1,
-	["flashlight_dist"] = 10000,
-	["cs_delay"] = 1
+	["pd_dist"] = 640000, --(DistToSqr, actual distance is 800)
+	["spawn_dist"] = 90000, --(DistToSqr, actual distance is 300)
+	["primaryattack_delay"] = 4, -- in seconds
+	["secondaryattack_delay"] = 0.25, -- in seconds
+	["lunge_delay"] = 1, -- in seconds
+	["bc_dist"] = 80, -- Bubble Checker dist, actual distance is 80
+	["bc_delay"] = 0.1, -- Bubble Checker Delay, in seconds
+	["flashlight_dist"] = 10000, --(DistToSqr, actual distance is 100)
+	["cs_delay"] = 1 -- Collision Sound Delay, in seconds
 }
-SWEP.uncollideEnt =
+SWEP.uncollideEnt = -- the entity classes that SCP 106 won't collide with
 {
 	["func_door"] = true,
 	["prop_physics"] = true,
@@ -64,7 +64,7 @@ function SWEP:SetupDataTables()
 	self:NetworkVar("Vector", 1, "SCP106PocketDimension")
 	self:NetworkVar("Vector", 2, "SCP106Spawn")
 end
-function SWEP:Initialize()
+function SWEP:Initialize() -- Leaving this here 
 	if not file.Exists("scp106_remastered", "DATA") then
 		file.CreateDir("scp106_remastered")
 	end
@@ -84,6 +84,8 @@ function SWEP:Initialize()
 		self:SetSCP106PocketDimension(util.JSONToTable(file.Read("scp106_remastered/scp106_pocketdimension.txt", "DATA"))[game.GetMap()])
 		print("SCP 106 Pocket Dimension Loaded")
 	end
+	hook.Remove("PlayerSwitchFlashlight", "CheckFlashLight")
+	hook.Add("PlayerSwitchFlashlight", "CheckFlashLight", SCP106FlashlightDance)
 end
 function SWEP:PrimaryAttack()
 	self:TPtoPoint()
@@ -97,35 +99,47 @@ function SWEP:SecondaryAttack()
 	end
 end
 function SWEP:Reload()
-	-- This function is going to teleport the player forwards a short ways. 
-	self:Lunge()
+	self:Lunge() -- This function is going to teleport the player forwards a short ways. 
 end
 function SWEP:Think()
+	if not self:GetOwner():IsValid() then return end
+	local scp106 = self:GetOwner()
+	if not scp106:IsValid() then return end
 	if self:GetSCP106PocketDimension() == nil or self:GetSCP106Spawn() == nil or self.scp106_configTable == nil then
 		self:Initialize()
 	end
 	if self.scp106_configTable != nil then
 		self:BubbleChecker()
 	end
+	if SERVER and scp106:GetPos():DistToSqr(self:GetSCP106Spawn()) < self.scp106_configTable.spawn_dist then
+		hook.Remove("ShouldCollide", "SCP106Collisions") -- This hook is also removed when a player spawns and the SWEP can't find anyone on TEAM_SCP106
+	elseif SERVER and scp106:GetPos():DistToSqr(self:GetSCP106Spawn()) > self.scp106_configTable.spawn_dist then
+		hook.Remove("ShouldCollide", "SCP106Collisions") -- This removes any existing hook, prevents dupes.
+		hook.Add("ShouldCollide", "SCP106Collisions", function(ent1, ent2)
+			if not (ent1:IsValid() and ent2:IsValid()) then return end
+			if ent1:Team() == TEAM_SCP106 and ent1:GetActiveWeapon():GetClass() == "scp106_remastered" and ent1:GetActiveWeapon().uncollideEnt[ent2:GetClass()] then -- This checks if the object you're about to collide with is one of the classes stored in uncollideEnt
+				return false --SCP106EntCollision(ent1, ent2)
+			end
+		end)
+	end
 end
-
 function SWEP:Deploy()
+	if not self:GetOwner():IsValid() then return end
 	local scp106 = self:GetOwner()
 	if (not scp106:IsValid()) then return end
 	self:SetHoldType("normal")
 	scp106:SetRunSpeed(120)
 	scp106:SetWalkSpeed(120)
 	scp106:SetJumpPower(150)
-	scp106:SetSolidFlags(4)
-end
-function SWEP:Holster()
 end
 --[[
 RELOAD FUNCTIONS
 ]]--
 function SWEP:Lunge()
+	if not self:GetOwner():IsValid() then return end
 	local scp106 = self:GetOwner()
-	if CurTime() > self:GetLungeTiming() and self:GetPos():DistToSqr(self:GetSCP106Spawn()) > self.scp106_configTable.spawn_dist then
+	if not scp106:IsValid() then return end
+	if CurTime() > self:GetLungeTiming() and scp106:GetPos():DistToSqr(self:GetSCP106Spawn()) > self.scp106_configTable.spawn_dist then
 		self:SetLungeTiming(CurTime() + self.scp106_configTable.lunge_delay)
 		scp106:SetPos(scp106:EyePos() + Vector(0, 0, -50) + scp106:GetAimVector() * math.random(50, 75))
 	end
@@ -134,9 +148,10 @@ end
 PRIMARY ATTACK FUNCTIONS, moves the player to the saved position set with Secondary Attack
 ]]--
 function SWEP:TPtoPoint()
-	local pos = self:GetOwner():GetPos()
+	if not self:GetOwner():IsValid() then return end
 	local scp106 = self:GetOwner()
-	if (not scp106:IsValid()) then return end
+	if not scp106:IsValid() then return end
+	local pos = scp106:GetPos()
 	if self:GetSCP106SavedPos() == vector_origin and IsFirstTimePredicted() and CLIENT then
 		scp106:PrintMessage(HUD_PRINTTALK, "No Position Set! Use LMB to set an Exit!")
 		return
@@ -155,11 +170,12 @@ end
 PASSIVE ABILITY FUNCTIONS, teleports anyone close to the player away to the "scp106pocketdimension" vector coord. Also handles the logic that plays a sound from entities that scp106 gets close to
 ]]--
 function SWEP:BubbleChecker()
+	if (not self:GetOwner():IsValid()) then return end
+	local scp106 = self:GetOwner()
+	if (not scp106:IsValid()) then return end
+	local scp106pos = scp106:GetPos()
 	if CurTime() > self:GetBubbleCheckerIdle() then
-		self:SetBubbleCheckerIdle(CurTime() + self.scp106_configTable.bc_delay) -- limits checking the bubble around SCP 106 no more than ten times per second. 
-		local scp106 = self:GetOwner()
-		if (not scp106:IsValid()) then return end
-		local scp106pos = scp106:GetPos()
+		self:SetBubbleCheckerIdle(CurTime() + self.scp106_configTable.bc_delay) -- limits checking the bubble around SCP 106 no more than ten times per second by default. 
 		local mybubble = ents.FindInSphere(scp106pos, self.scp106_configTable.bc_dist) -- by default this checks within 100 units of the player
 		for k, v in pairs(mybubble) do
 			if v:IsPlayer() and v != scp106 then
@@ -177,7 +193,9 @@ function SWEP:BubbleChecker()
 	end
 end
 function SWEP:ActivateNoCollision(target, min) -- After a player is TP'd to the pocket dimension, this checks that they're not colliding with anyone else there. 
+	if not target:IsValid() then return end
 	local oldCollision = target:GetCollisionGroup() or COLLISION_GROUP_PLAYER
+	if not target:GetPhysicsObject():IsValid() then return end
 	local physobj = target:GetPhysicsObject()
 	target:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR) -- Players can walk through target
 	if (min and (tonumber(min) > 0)) then
@@ -206,13 +224,14 @@ SECONDARY ATTACK FUNCTIONS
 function SWEP:CreateTeleportPoint()
 	local scp106 = self:GetOwner()
 	if (not scp106:IsValid()) then return end
-	self.startingpos = self:GetOwner():GetPos()
+	self.startingpos = scp106:GetPos()
 	if self.startingpos:DistToSqr(self:GetSCP106Spawn()) > self.scp106_configTable.spawn_dist and scp106:GetEyeTrace().HitPos:DistToSqr(self:GetSCP106Spawn()) > self.scp106_configTable.spawn_dist and self.startingpos:DistToSqr(self:GetSCP106PocketDimension()) > self.scp106_configTable.pd_dist and scp106:GetEyeTrace().HitPos:DistToSqr(self:GetSCP106PocketDimension()) > self.scp106_configTable.pd_dist then -- Simply prevents you from using this on/in spawn 1 and spawn 2.   
 	  self:SetSCP106SavedPos(scp106:GetEyeTrace().HitPos)
-	  	--if self:TPTraceHull(scp106, self:GetSCP106SavedPos(), self.startingpos) then
 		local effectdata = EffectData()
-		scp106:StopSound(self.laughsound)
-		scp106:EmitSound(self.laughsound)
+		if SERVER then
+			scp106:StopSound(self.laughsound)
+			scp106:EmitSound(self.laughsound)
+		end
 		effectdata:SetAngles(Angle(180,0,0))
 		effectdata:SetStart(self:GetSCP106SavedPos())
 		effectdata:SetOrigin(self:GetSCP106SavedPos())
@@ -227,8 +246,35 @@ function SWEP:CreateTeleportPoint()
 	end
 end
 --[[ 
+	HOOKS and Custom Stuff 
+]]--
+local function SCP106CheckCustomCollisions(playa) -- Called by the PlayerSpawn hook
+	if (not playa:IsValid()) then return end
+	if not team.GetPlayers(TEAM_SCP106)[1] then -- If there's no player on TEAM_SCP106 it stops the ShouldCollide hook. 
+		hook.Remove("ShouldCollide", "SCP106Collisions")
+		hook.Remove("PlayerSwitchFlashlight", "CheckFlashLight")
+	end
+	if playa:Team() == TEAM_SCP106 then --If the player that spawned is SCP106, custom collisions are set to True. 
+		playa:SetCustomCollisionCheck(true)
+	end
+end
+function SCP106FlashlightDance(ply) --The TEAM_SCP106 player should be teleported back to  their "pocketdimension" coords if someone within ~100 units turns on their flashlight. Distance needs to be playtested. 
+	if not team.GetPlayers(TEAM_SCP106)[1] or ply:Team() == TEAM_SCP106 or not ply:GetEyeTrace().Entity:IsPlayer() then return true end -- Ignores TEAM_SCP106 enabling their flashlight
+	if ply:GetEyeTrace().Entity:Team() == TEAM_SCP106 then  --checks that the person using the flashlight is looking at a person and that person needs to be on TEAM_SCP106
+		local scp106 = ply:GetEyeTrace().Entity
+		local scp106weapon = scp106:GetActiveWeapon()
+		if ply:GetPos():DistToSqr(scp106weapon:GetSCP106PocketDimension()) < scp106weapon.scp106_configTable.pd_dist then return end
+		if ply:GetPos():DistToSqr(scp106:GetPos()) < scp106:GetActiveWeapon().scp106_configTable.flashlight_dist and scp106:GetEyeTrace().HitWorld then -- if SCP 106 is looking at the world, and if he's close enough, do the things
+			scp106weapon:SetSCP106SavedPos(scp106:GetEyeTrace().HitPos) -- set the NetworkVar for saved pos so that SCP 106 can teleport back there later. 
+			scp106:SetPos(scp106weapon:GetSCP106PocketDimension()) --send SCP 106 to the pocket dimension. 
+		end
+		return
+	end
+end
+hook.Add("PlayerSpawn", "CheckForSCP106", SCP106CheckCustomCollisions)
+--[[ 
 SERVER STUFF
- ]]--
+]]--
 if SERVER then
 	local SCP106Spawn = {}
 	local SCP106PocketDimension = {}
@@ -248,24 +294,4 @@ if SERVER then
 		file.Write("scp106_remastered/scp106_pocketdimension.txt", util.TableToJSON(SCP106PocketDimension))
 		ply:PrintMessage(HUD_PRINTCONSOLE, "SCP 106 Remastered - Pocket Dimension has been saved!")
 	end )
-	function SCP106FlashlightDance(ply) --The TEAM_SCP106 player should be teleported back to  their "pocketdimension" coords if someone within ~100 units turns on their flashlight. Distance needs to be playtested. 
-		if not team.GetPlayers(TEAM_SCP106)[1] or ply:Team() == TEAM_SCP106 or not ply:GetEyeTrace().Entity:IsPlayer() then return true end -- Ignores TEAM_SCP106 enabling their flashlight
-		if ply:GetEyeTrace().Entity:Team() == TEAM_SCP106 then  --checks that the person using the flashlight is looking at a person and that person needs to be on TEAM_SCP106
-			local scp106 = ply:GetEyeTrace().Entity
-			local scp106weapon = scp106:GetActiveWeapon()
-			if ply:GetPos():DistToSqr(scp106weapon:GetSCP106PocketDimension()) < scp106weapon.scp106_configTable.pd_dist then return end
-			if ply:GetPos():DistToSqr(scp106:GetPos()) < scp106:GetActiveWeapon().scp106_configTable.flashlight_dist and scp106:GetEyeTrace().HitWorld then -- if SCP 106 is looking at the world, and if he's close enough, do the things
-				scp106weapon:SetSCP106SavedPos(scp106:GetEyeTrace().HitPos) -- set the NetworkVar for saved pos so that SCP 106 can teleport back there later. 
-				scp106:SetPos(scp106weapon:GetSCP106PocketDimension()) --send SCP 106 to the pocket dimension. 
-			end
-			return
-		end
-	end
---[[ 	function SCP106CheckCustomCollisions(playa) -- Checks for a player on TEAM_SCP106, if the player is on that team it will enable CustomCollisionChecks allowing the player to pass through Ent classes in local uncollideEnt
-		if playa:Team() == TEAM_SCP106 then
-			playa:SetCustomCollisionCheck(true)
-		end
-	end ]]
-	hook.Add("PlayerSwitchFlashlight", "CheckFlashLight", SCP106FlashlightDance) -- check for people using their flashlights
-	--[[ hook.Add("PlayerSpawn", "CheckForSCP106", SCP106CheckCustomCollisions) -- Sets to true for SCP106 when he spawns in, false for anyone spawning in as anything else ]]
 end
