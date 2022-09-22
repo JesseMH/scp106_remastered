@@ -111,17 +111,6 @@ function SWEP:Think()
 	if self.scp106_configTable != nil then
 		self:BubbleChecker()
 	end
-	if SERVER and scp106:GetPos():DistToSqr(self:GetSCP106Spawn()) < self.scp106_configTable.spawn_dist then
-		hook.Remove("ShouldCollide", "SCP106Collisions") -- This hook is also removed when a player spawns and the SWEP can't find anyone on TEAM_SCP106
-	elseif SERVER and scp106:GetPos():DistToSqr(self:GetSCP106Spawn()) > self.scp106_configTable.spawn_dist then
-		hook.Remove("ShouldCollide", "SCP106Collisions") -- This removes any existing hook, prevents dupes.
-		hook.Add("ShouldCollide", "SCP106Collisions", function(ent1, ent2)
-			if not (ent1:IsValid() and ent2:IsValid()) then return end
-			if ent1:Team() == TEAM_SCP106 and ent1:GetActiveWeapon():GetClass() == "scp106_remastered" and ent1:GetActiveWeapon().uncollideEnt[ent2:GetClass()] then -- This checks if the object you're about to collide with is one of the classes stored in uncollideEnt
-				return false --SCP106EntCollision(ent1, ent2)
-			end
-		end)
-	end
 end
 function SWEP:Deploy()
 	if not self:GetOwner():IsValid() then return end
@@ -132,6 +121,7 @@ function SWEP:Deploy()
 	scp106:SetWalkSpeed(120)
 	scp106:SetJumpPower(150)
 end
+
 --[[
 RELOAD FUNCTIONS
 ]]--
@@ -176,12 +166,16 @@ function SWEP:BubbleChecker()
 	local scp106pos = scp106:GetPos()
 	if CurTime() > self:GetBubbleCheckerIdle() then
 		self:SetBubbleCheckerIdle(CurTime() + self.scp106_configTable.bc_delay) -- limits checking the bubble around SCP 106 no more than ten times per second by default. 
-		local mybubble = ents.FindInSphere(scp106pos, self.scp106_configTable.bc_dist) -- by default this checks within 100 units of the player
+		local mybubble = ents.FindInSphere(scp106pos, 100) -- by default this checks within 100 units of the player
 		for k, v in pairs(mybubble) do
 			if v:IsPlayer() and v != scp106 then
-				v:SetPos(self:GetSCP106PocketDimension())
-				self:ActivateNoCollision(v, 1)
-				v:TakeDamage(25)
+				if scp106:GetPos():DistToSqr(self:GetSCP106Spawn()) < self.scp106_configTable.spawn_dist then return end
+					if scp106:GetPos():DistToSqr(v:GetPos()) < (80 * 80) then
+						v:SetPos(self:GetSCP106PocketDimension())
+						self:ActivateNoCollision(v, 1)
+						v:TakeDamage(25)
+						return
+					end
 			elseif CurTime() > self:GetCollisionSoundDelay() and self.uncollideEnt[v:GetClass()] and scp106pos:DistToSqr(v:GetPos()) < 3317.76 then
 				if SERVER then
 					v:StopSound(self.corrosionsound)
@@ -189,8 +183,25 @@ function SWEP:BubbleChecker()
 					scp106:GetActiveWeapon():SetCollisionSoundDelay(CurTime() + self.scp106_configTable.cs_delay)
 				end
 			end
+			if self.uncollideEnt[v:GetClass()] and scp106pos:DistToSqr(v:GetPos()) < (75 * 75) then
+				if scp106:GetPos():DistToSqr(self:GetSCP106Spawn()) < self.scp106_configTable.spawn_dist then return end
+				v:SetCollisionGroup(15)
+			end
+			if scp106:GetPos():DistToSqr(v:GetPos()) >= (75 * 75) and self.uncollideEnt[v:GetClass()] and v:GetCollisionGroup(15) then
+				v:SetCollisionGroup(0)
+			end
 		end
 	end
+end
+function SWEP:Holster()
+	print("Holster")
+	local mybubble = ents.FindInSphere(self:GetOwner():GetPos(), 100)
+	for k, v in pairs(mybubble) do
+		if self.uncollideEnt[v:GetClass()] and v:GetCollisionGroup(15) then
+			v:SetCollisionGroup(0)
+		end
+	end
+	return true
 end
 function SWEP:ActivateNoCollision(target, min) -- After a player is TP'd to the pocket dimension, this checks that they're not colliding with anyone else there. 
 	if not target:IsValid() then return end
@@ -251,7 +262,6 @@ end
 local function SCP106CheckCustomCollisions(playa) -- Called by the PlayerSpawn hook
 	if (not playa:IsValid()) then return end
 	if not team.GetPlayers(TEAM_SCP106)[1] then -- If there's no player on TEAM_SCP106 it stops the ShouldCollide hook. 
-		hook.Remove("ShouldCollide", "SCP106Collisions")
 		hook.Remove("PlayerSwitchFlashlight", "CheckFlashLight")
 	end
 	if playa:Team() == TEAM_SCP106 then --If the player that spawned is SCP106, custom collisions are set to True. 
