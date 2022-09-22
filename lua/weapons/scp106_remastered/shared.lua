@@ -261,11 +261,8 @@ end
 ]]--
 local function SCP106CheckCustomCollisions(playa) -- Called by the PlayerSpawn hook
 	if (not playa:IsValid()) then return end
-	if not team.GetPlayers(TEAM_SCP106)[1] then -- If there's no player on TEAM_SCP106 it stops the ShouldCollide hook. 
+	if not team.GetPlayers(TEAM_SCP106)[1] then
 		hook.Remove("PlayerSwitchFlashlight", "CheckFlashLight")
-	end
-	if playa:Team() == TEAM_SCP106 then --If the player that spawned is SCP106, custom collisions are set to True. 
-		playa:SetCustomCollisionCheck(true)
 	end
 end
 function SCP106FlashlightDance(ply) --The TEAM_SCP106 player should be teleported back to  their "pocketdimension" coords if someone within ~100 units turns on their flashlight. Distance needs to be playtested. 
